@@ -15,7 +15,7 @@ FILE_LOG="/var/log/${KERNEL_NAME}.log"
 FILE_PID="/run/${KERNEL_NAME}.pid"
 
 _valid_required() {
-    local required_cmds=("xz" "pgrep" "curl" "tar" 'unzip')
+    local required_cmds=("xz" "pgrep" "curl" "tar")
     local missing=()
     for cmd in "${required_cmds[@]}"; do
         command -v "$cmd" >&/dev/null || missing+=("$cmd")
@@ -64,6 +64,7 @@ _prepare_zip() {
     esac
     [ ! -f "$ZIP_YQ" ] && required_zips+=("yq")
     [ ! -f "$ZIP_SUBCONVERTER" ] && required_zips+=("subconverter")
+    [ ! -f "$ZIP_UI" ] && required_zips+=("ui")
 
     _download_zip "${required_zips[@]}"
 
@@ -83,10 +84,11 @@ _load_zip() {
     ZIP_MIHOMO=$(echo "${ZIP_BASE_DIR}"/mihomo*)
     ZIP_YQ=$(echo "${ZIP_BASE_DIR}"/yq*)
     ZIP_SUBCONVERTER=$(echo "${ZIP_BASE_DIR}"/subconverter*)
+    ZIP_UI=$(echo "${ZIP_BASE_DIR}"/ui*)
 }
 _download_zip() {
     (($#)) || return 0
-    local url_clash url_mihomo url_yq url_subconverter
+    local url_clash url_mihomo url_yq url_subconverter url_ui
     local arch=$(uname -m)
     case "$arch" in
     x86_64)
@@ -100,24 +102,28 @@ _download_zip() {
         url_mihomo=https://github.com/MetaCubeX/mihomo/releases/download/${VERSION_MIHOMO##*-}/mihomo-linux-amd64-${VERSION_MIHOMO}.gz
         url_yq=https://github.com/mikefarah/yq/releases/download/${VERSION_YQ}/yq_linux_amd64.tar.gz
         url_subconverter=https://github.com/tindy2013/subconverter/releases/download/${VERSION_SUBCONVERTER}/subconverter_linux64.tar.gz
+        url_ui=https://github.com/MetaCubeX/metacubexd/releases/download/v${VERSION_UI}/compressed-dist.tgz
         ;;
     *86*)
         url_clash=https://downloads.clash.wiki/ClashPremium/clash-linux-386-2023.08.17.gz
         url_mihomo=https://github.com/MetaCubeX/mihomo/releases/download/${VERSION_MIHOMO##*-}/mihomo-linux-386-${VERSION_MIHOMO}.gz
         url_yq=https://github.com/mikefarah/yq/releases/download/${VERSION_YQ}/yq_linux_386.tar.gz
         url_subconverter=https://github.com/tindy2013/subconverter/releases/download/${VERSION_SUBCONVERTER}/subconverter_linux32.tar.gz
+        url_ui=https://github.com/MetaCubeX/metacubexd/releases/download/v${VERSION_UI}/compressed-dist.tgz
         ;;
     armv*)
         url_clash=https://downloads.clash.wiki/ClashPremium/clash-linux-armv5-2023.08.17.gz
         url_mihomo=https://github.com/MetaCubeX/mihomo/releases/download/${VERSION_MIHOMO##*-}/mihomo-linux-armv7-${VERSION_MIHOMO}.gz
         url_yq=https://github.com/mikefarah/yq/releases/download/${VERSION_YQ}/yq_linux_arm.tar.gz
         url_subconverter=https://github.com/tindy2013/subconverter/releases/download/${VERSION_SUBCONVERTER}/subconverter_armv7.tar.gz
+        url_ui=https://github.com/MetaCubeX/metacubexd/releases/download/v${VERSION_UI}/compressed-dist.tgz
         ;;
     aarch64)
         url_clash=https://downloads.clash.wiki/ClashPremium/clash-linux-arm64-2023.08.17.gz
         url_mihomo=https://github.com/MetaCubeX/mihomo/releases/download/${VERSION_MIHOMO##*-}/mihomo-linux-arm64-${VERSION_MIHOMO}.gz
         url_yq=https://github.com/mikefarah/yq/releases/download/${VERSION_YQ}/yq_linux_arm64.tar.gz
         url_subconverter=https://github.com/tindy2013/subconverter/releases/download/${VERSION_SUBCONVERTER}/subconverter_aarch64.tar.gz
+        url_ui=https://github.com/MetaCubeX/metacubexd/releases/download/v${VERSION_UI}/compressed-dist.tgz
         ;;
     *)
         _error_quit "未知的架构版本：$arch，请自行下载对应版本至 ${ZIP_BASE_DIR} 目录"
@@ -129,9 +135,11 @@ _download_zip() {
         [mihomo]="$url_mihomo"
         [yq]="$url_yq"
         [subconverter]="$url_subconverter"
+        [ui]="$url_ui"
     )
 
     local item target_zips=()
+    mkdir -p "$ZIP_BASE_DIR"
     _okcat '🖥️ ' "系统架构：$arch $level"
     for item in "$@"; do
         local url="${urls[$item]}"
@@ -139,6 +147,7 @@ _download_zip() {
         [ "$item" != 'clash' ] && url="$proxy_url"
         _okcat '⏳' "正在下载：${item}：$url"
         local target="${ZIP_BASE_DIR}/$(basename "$url")"
+        [ "$item" = "ui" ] && target="${ZIP_BASE_DIR}/ui.tgz"
         curl \
             --progress-bar \
             --show-error \
@@ -169,7 +178,10 @@ _unzip_zip() {
     /bin/mv -f "${BIN_BASE_DIR}"/yq_* "${BIN_BASE_DIR}/yq"
     tar -xf "$ZIP_SUBCONVERTER" -C "$BIN_BASE_DIR"
     /bin/cp "$BIN_SUBCONVERTER_DIR/pref.example.yml" "$BIN_SUBCONVERTER_CONFIG"
-    unzip -oqq "$ZIP_UI" -d "$RESOURCES_BASE_DIR" 2>/dev/null || tar -xf "$ZIP_UI" -C "$RESOURCES_BASE_DIR"
+    
+    local ui_dir="$RESOURCES_BASE_DIR/ui"
+    mkdir -p "$ui_dir"
+    tar -xf "$ZIP_UI" -C "$ui_dir"
 }
 
 # shellcheck disable=SC2206
@@ -381,6 +393,7 @@ _set_envs() {
     _set_env KERNEL_NAME "$KERNEL_NAME"
     _set_env CLASH_BASE_DIR "$CLASH_BASE_DIR"
     _set_env VERSION_MIHOMO "$VERSION_MIHOMO"
+    _set_env VERSION_UI "$VERSION_UI"
 }
 
 _get_random_val() {
